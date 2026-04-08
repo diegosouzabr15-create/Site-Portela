@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login Admin — Olimpiadas da Rede Publica</title>
+  <meta name="description" content="Faça login como administrador." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="auth-page">
+  <div class="auth-wrap">
+    <div class="auth-logo">
+      <div class="logo-icon">🏆</div>
+      <h1>Olimpiadas da Rede Publica</h1>
+      <p>Login de Administrador</p>
+    </div>
+
+    <div class="auth-card">
+      <h2>Entrar como admin</h2>
+
+      <div id="alert" class="alert" role="alert"></div>
+
+      <form id="form-login" novalidate>
+        <div class="form-group">
+          <label for="escola">Nome da escola</label>
+          <input type="text" id="escola" placeholder="Ex: EE. Professor Jose de Almeida" autocomplete="off" />
+          <div class="err" id="err-escola">Informe o nome da escola.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" placeholder="Sua senha" autocomplete="current-password" />
+          <div class="err" id="err-senha">Informe sua senha.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btn-submit">Entrar</button>
+      </form>
+    </div>
+
+    <div class="auth-footer">
+      <a href="login.html">Login de aluno</a> &nbsp;|&nbsp; <a href="cadastro-admin.html">Criar conta admin</a>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script>
+    if (getCurrentUser()) window.location.href = 'index.html';
+
+    const form = document.getElementById('form-login');
+    const alert = document.getElementById('alert');
+
+    function showAlert(msg, type = 'error') {
+      alert.className = 'alert alert-' + type + ' show';
+      alert.textContent = msg;
+    }
+    function setErr(id, show) {
+      document.getElementById(id).classList.toggle('is-error', show);
+      document.getElementById('err-' + id).classList.toggle('show', show);
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      alert.className = 'alert';
+
+      const escola = document.getElementById('escola').value.trim();
+      const senha = document.getElementById('senha').value;
+
+      let ok = true;
+      if (!escola) { setErr('escola', true); ok = false; } else setErr('escola', false);
+      if (!senha) { setErr('senha', true); ok = false; } else setErr('senha', false);
+      if (!ok) return;
+
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.innerHTML = '<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div> Entrando...';
+
+      const result = await loginAdmin(escola, senha);
+
+      if (!result.success) {
+        showAlert(result.error);
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      } else {
+        showAlert('Login realizado! Redirecionando...', 'success');
+        setTimeout(() => window.location.href = 'index.html', 900);
+      }
+    });
+
+    ['escola', 'senha'].forEach(id => {
+      document.getElementById(id).addEventListener('input', () => setErr(id, false));
+    });
+  </script>
+  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+</body>
+</html>

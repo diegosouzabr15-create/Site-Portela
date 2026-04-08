@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadastro Admin — Olimpiadas da Rede Publica</title>
+  <meta name="description" content="Crie conta de administrador para gerenciar inscricoes." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="auth-page">
+  <div class="auth-wrap">
+    <div class="auth-logo">
+      <div class="logo-icon">🏆</div>
+      <h1>Olimpiadas da Rede Publica</h1>
+      <p>Cadastro de Administrador</p>
+    </div>
+
+    <div class="auth-card">
+      <h2>Criar conta admin</h2>
+
+      <div id="alert" class="alert" role="alert"></div>
+
+      <form id="form-admin" novalidate>
+        <div class="form-group">
+          <label for="nome">Nome completo</label>
+          <input type="text" id="nome" placeholder="Ex: Pedro Santos" autocomplete="name" />
+          <div class="err" id="err-nome">Informe o nome completo.</div>
+        </div>
+
+        <div class="form-group">
+          <label for="escola">Nome da escola</label>
+          <input type="text" id="escola" placeholder="Ex: EE. Professor Jose de Almeida" autocomplete="off" />
+          <div class="err" id="err-escola">Informe o nome da escola.</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="form-group">
+          <label for="admin-key">Chave de Administrador</label>
+          <input type="password" id="admin-key" placeholder="Chave secreta para cadastro admin" autocomplete="off" />
+          <div class="err" id="err-admin-key">Informe a chave de administrador.</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="senha">Criar senha</label>
+            <input type="password" id="senha" placeholder="Minimo 6 caracteres" autocomplete="new-password" />
+            <div class="err" id="err-senha">A senha deve ter pelo menos 6 caracteres.</div>
+          </div>
+          <div class="form-group">
+            <label for="confirma">Confirmar senha</label>
+            <input type="password" id="confirma" placeholder="Repita a senha" autocomplete="new-password" />
+            <div class="err" id="err-confirma">As senhas nao coincidem.</div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btn-submit">Criar conta admin</button>
+      </form>
+    </div>
+
+    <div class="auth-footer">
+      <a href="login.html">Voltar para login</a>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script>
+    if (getCurrentUser()) window.location.href = 'index.html';
+
+    const form = document.getElementById('form-admin');
+    const alert = document.getElementById('alert');
+
+    function showAlert(msg, type = 'error') {
+      alert.className = 'alert alert-' + type + ' show';
+      alert.textContent = msg;
+    }
+    function hideAlert() { alert.className = 'alert'; }
+
+    function setErr(id, show) {
+      const input = document.getElementById(id);
+      const err = document.getElementById('err-' + id);
+      if (input) input.classList.toggle('is-error', show);
+      if (err) err.classList.toggle('show', show);
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      hideAlert();
+
+      const nome = document.getElementById('nome').value.trim();
+      const escola = document.getElementById('escola').value.trim();
+      const adminKey = document.getElementById('admin-key').value;
+      const senha = document.getElementById('senha').value;
+      const confirma = document.getElementById('confirma').value;
+
+      let ok = true;
+      setErr('nome', !nome) && (ok = false);
+      setErr('escola', !escola) && (ok = false);
+      setErr('admin-key', !adminKey) && (ok = false);
+      setErr('senha', senha.length < 6) && (ok = false);
+      setErr('confirma', senha !== confirma) && (ok = false);
+
+      if (!ok) return;
+
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.innerHTML = '<div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div> Criando conta...';
+
+      const result = await registerAdmin({ nomeCompleto: nome, nomeEscola: escola, senha: senha, adminKey: adminKey });
+
+      if (!result.success) {
+        showAlert(result.error);
+        btn.disabled = false;
+        btn.textContent = 'Criar conta admin';
+      } else {
+        showAlert('Conta admin criada com sucesso! Redirecionando...', 'success');
+        setTimeout(() => window.location.href = 'index.html', 1200);
+      }
+    });
+
+    ['nome', 'escola', 'admin-key', 'senha', 'confirma'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => setErr(id, false));
+    });
+  </script>
+  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+</body>
+</html>

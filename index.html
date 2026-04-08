@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Olimpíadas da Rede Pública — Início</title>
+  <meta name="description" content="Confira e inscreva-se nas olimpíadas disponíveis para alunos da rede pública estadual." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="app-page">
+
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+
+  <!-- Header -->
+  <header class="app-header" role="banner">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-icon" role="img" aria-label="Olimpíadas da Rede Pública">🏆</div>
+        <div>
+          <div class="brand-name">Olimpíadas da Rede Pública</div>
+          <div class="brand-sub">Portal de Inscrições Estaduais</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="user-info">
+          <div class="user-label">Olá,</div>
+          <div class="user-name" id="user-name">Carregando...</div>
+        </div>
+        <button class="btn-admin" id="btn-admin" style="display:none" aria-label="Checar pedidos de inscrição">
+          📋 Checar pedidos <span class="badge-count" id="badge-count" aria-hidden="true"></span>
+        </button>
+        <button class="btn-logout" id="btn-logout" aria-label="Sair da conta">⬅ Sair</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-text">
+        <h1>Olimpíadas Escolares da Rede Pública</h1>
+        <p>Encontre e inscreva-se nas olimpíadas disponíveis para alunos da rede estadual de todo o Brasil.</p>
+      </div>
+      <div class="stats">
+        <div class="stat-chip">
+          <span class="stat-val" id="total-count">24</span>
+          <span class="stat-lbl">Olimpíadas</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-val" id="enrolled-count">0</span>
+          <span class="stat-lbl">Suas inscrições</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Legend -->
+  <div class="legend" aria-label="Legenda dos status">
+    <span class="legend-label">Status:</span>
+    <span class="legend-item open">Inscrições abertas</span>
+    <span class="legend-item ongoing">Em andamento</span>
+    <span class="legend-item closed">Inscrições fechadas</span>
+    <span class="legend-item finished">Encerrada</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls" role="search" aria-label="Filtros e busca">
+    <div class="search-wrap">
+      <span class="search-icon" aria-hidden="true">🔍</span>
+      <input type="search" id="search-input" placeholder="Buscar por nome ou sigla..." aria-label="Buscar olimpíadas" />
+    </div>
+    <label for="area-filter" class="sr-only">Filtrar por área</label>
+    <select class="filter" id="area-filter">
+      <option value="">Todas as áreas</option>
+    </select>
+    <label for="status-filter" class="sr-only">Filtrar por status</label>
+    <select class="filter" id="status-filter">
+      <option value="">Todos os status</option>
+    </select>
+  </div>
+
+  <!-- Admin Panel -->
+  <section class="admin-panel" id="admin-panel" style="display:none" aria-labelledby="admin-title" role="region">
+    <div class="admin-header">
+      <h2 id="admin-title">📋 Pedidos de Inscrição</h2>
+      <button class="btn-close" id="btn-close-panel" aria-label="Fechar painel de administração">✕ Fechar</button>
+    </div>
+    <div class="admin-filters">
+      <select id="admin-olympiad-filter">
+        <option value="">Todas as olimpíadas</option>
+      </select>
+      <button class="btn-export" id="btn-export-csv">📥 Exportar CSV</button>
+    </div>
+    <div class="admin-table-wrap">
+      <table class="admin-table" id="admin-table">
+        <thead>
+          <tr>
+            <th>Aluno</th>
+            <th>Matrícula</th>
+            <th>Olimpíada</th>
+            <th>DataInscrição</th>
+          </tr>
+        </thead>
+        <tbody id="admin-tbody"></tbody>
+      </table>
+    </div>
+    <div class="admin-empty" id="admin-empty" style="display:none">Nenhum pedido de inscrição encontrado.</div>
+  </section>
+
+  <!-- Grid -->
+  <main class="grid-wrap" id="main-grid">
+    <div class="grid-label" id="grid-label" aria-live="polite">24 olimpíadas encontradas</div>
+    <div class="grid" id="olympiads-grid" role="list" aria-label="Lista de olimpíadas"></div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
