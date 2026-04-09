@@ -119,6 +119,28 @@ body {
 .form-group input::placeholder { color: var(--muted); }
 .form-group input.is-error { border-color: #ef4444; background: #fff5f5; }
 
+.email-verify-wrap { display: flex; gap: .5rem; }
+.email-verify-wrap input { flex: 1; }
+.btn-verify-email {
+  background: var(--blue); color: white; border: none;
+  padding: .7rem 1rem; border-radius: var(--radius);
+  font-size: .8rem; font-weight: 600; cursor: pointer;
+  font-family: inherit; white-space: nowrap;
+}
+.btn-verify-email:hover { background: var(--blue-l); }
+.btn-verify-email:disabled { opacity: .6; cursor: not-allowed; }
+.email-code-group { margin-top: .5rem; }
+.btn-resend-code {
+  background: none; border: none; color: var(--blue);
+  font-size: .8rem; cursor: pointer; margin-top: .5rem;
+  text-decoration: underline;
+}
+.email-verified {
+  background: #f0fdf4; border: 1.5px solid #86efac;
+  color: #15803d; padding: .7rem 1rem; border-radius: var(--radius);
+  font-size: .85rem; font-weight: 600; margin-bottom: 1rem;
+}
+
 .err { font-size: .75rem; color: #dc2626; margin-top: .3rem; display: none; }
 .err.show { display: block; }
 

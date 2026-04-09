@@ -49,7 +49,7 @@ function requireAuth() {
 // -------------------------------------------------------------
 //  CADASTRO
 // -------------------------------------------------------------
-async function register({ nomeCompleto, nomeResponsavel, dataNascimento, matricula, senha, role = 'aluno', adminKey = '', nomeEscola = '' }) {
+async function register({ nomeCompleto, nomeResponsavel, email, dataNascimento, matricula, senha, role = 'aluno', adminKey = '', nomeEscola = '' }) {
 
   // ── Via Google Sheets ──────────────────────────────────────
   if (apiConfigurada()) {
@@ -60,6 +60,7 @@ async function register({ nomeCompleto, nomeResponsavel, dataNascimento, matricu
           action: 'cadastrar',
           nomeCompleto,
           nomeResponsavel,
+          email,
           dataNascimento,
           matricula,
           senhaHash: hashSimples(senha),
@@ -71,7 +72,7 @@ async function register({ nomeCompleto, nomeResponsavel, dataNascimento, matricu
       const data = await res.json();
       if (data.ok) {
         // Salva sessão com os dados retornados pela API
-        const user = { id: data.id, nomeCompleto, nomeResponsavel, dataNascimento, matricula, nomeEscola, inscricoes: [], role: data.role };
+        const user = { id: data.id, nomeCompleto, nomeResponsavel, email, dataNascimento, matricula, nomeEscola, inscricoes: [], role: data.role };
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));
         return { success: true, user };
       }
@@ -93,7 +94,7 @@ async function register({ nomeCompleto, nomeResponsavel, dataNascimento, matricu
 
   const user = {
     id: 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-    nomeCompleto, nomeResponsavel, dataNascimento, matricula,
+    nomeCompleto, nomeResponsavel, email, dataNascimento, matricula,
     senhaHash: hashSimples(senha),
     role: role,
     inscricoes: [],

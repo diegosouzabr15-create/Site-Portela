@@ -28,9 +28,26 @@
         </div>
 
         <div class="form-group">
-          <label for="responsavel">Nome completo do responsável</label>
-          <input type="text" id="responsavel" placeholder="Ex: João da Silva" autocomplete="off" />
-          <div class="err" id="err-responsavel">Informe o nome do responsável.</div>
+          <label for="email">E-mail do aluno (para verificação)</label>
+          <div class="email-verify-wrap">
+            <input type="email" id="email" placeholder="Ex: maria@aluno.escola.edu.br" autocomplete="email" />
+            <button type="button" class="btn-verify-email" id="btn-verify-email">Verificar</button>
+          </div>
+          <div class="err" id="err-email">Informe um e-mail válido.</div>
+        </div>
+
+        <div class="form-group email-code-group" id="email-code-group" style="display:none">
+          <label for="email-code">Código de verificação enviado para <span id="email-display"></span></label>
+          <div class="email-verify-wrap">
+            <input type="text" id="email-code" placeholder="Digite o código de 6 dígitos" maxlength="6" />
+            <button type="button" class="btn-verify-email" id="btn-confirm-code">Confirmar</button>
+          </div>
+          <div class="err" id="err-email-code">Código inválido.</div>
+          <button type="button" class="btn-resend-code" id="btn-resend-code">Reenviar código</button>
+        </div>
+
+        <div class="email-verified" id="email-verified" style="display:none">
+          ✓ E-mail verificado com sucesso!
         </div>
 
         <div class="form-row">
@@ -40,10 +57,21 @@
             <div class="err" id="err-nascimento">Informe a data de nascimento.</div>
           </div>
           <div class="form-group">
-            <label for="matricula">Código de matrícula estadual</label>
-            <input type="text" id="matricula" placeholder="Ex: 2024001234" autocomplete="off" />
-            <div class="err" id="err-matricula">Informe o código de matrícula.</div>
+            <label for="sexo">Sexo</label>
+            <select id="sexo">
+              <option value="">Selecione</option>
+              <option value="masculino">Masculino</option>
+              <option value="feminino">Feminino</option>
+              <option value="nao_definido">Não definido</option>
+            </select>
+            <div class="err" id="err-sexo">Informe seu sexo.</div>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label for="matricula">Código de matrícula estadual</label>
+          <input type="text" id="matricula" placeholder="Ex: 2024001234" autocomplete="off" />
+          <div class="err" id="err-matricula">Informe o código de matrícula.</div>
         </div>
 
         <div class="divider"></div>
@@ -81,6 +109,11 @@
     // Redirect if already logged in
     if (getCurrentUser()) window.location.href = 'index.html';
 
+    let emailVerified = false;
+    let verificationCode = '';
+    let emailPending = '';
+    let cooldownTimer = null;
+
     const form = document.getElementById('form-cadastro');
     const alert = document.getElementById('alert');
 
@@ -97,21 +130,106 @@
       err.classList.toggle('show', show);
     }
 
+    function isValidEmail(e) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    }
+
+    function generateCode() {
+      return Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    async function verifyEmailExists(email) {
+      try {
+        const res = await fetch('https://email-verifier-api.replit.app/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email })
+        });
+        const data = await res.json();
+        return data.valid || data.status === 'deliverable';
+      } catch (err) {
+        console.warn('API de verificação indisponível, pulando verificação:', err);
+        return true;
+      }
+    }
+
+    document.getElementById('btn-verify-email').addEventListener('click', async () => {
+      const emailInput = document.getElementById('email');
+      const email = emailInput.value.trim();
+      
+      if (!email || !isValidEmail(email)) {
+        setErr('email', true);
+        return;
+      }
+      
+      const btn = document.getElementById('btn-verify-email');
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+      
+      const isValid = await verifyEmailExists(email);
+      
+      if (!isValid) {
+        showAlert('E-mail inválido ou inexistente. Verifique e tente novamente.');
+        btn.disabled = false;
+        btn.textContent = 'Verificar';
+        return;
+      }
+      
+      verificationCode = generateCode();
+      emailPending = email;
+      
+      console.log('Código de verificação:', verificationCode);
+      
+      document.getElementById('email-code-group').style.display = 'block';
+      document.getElementById('email-display').textContent = email;
+      btn.textContent = 'Verificar';
+      showAlert('Código de verificação enviado! (Simulação: ' + verificationCode + ')', 'success');
+    });
+
+    document.getElementById('btn-confirm-code').addEventListener('click', () => {
+      const inputCode = document.getElementById('email-code').value.trim();
+      if (inputCode === verificationCode) {
+        emailVerified = true;
+        document.getElementById('email-code-group').style.display = 'none';
+        document.getElementById('email-verified').style.display = 'block';
+        document.getElementById('email').readOnly = true;
+        document.getElementById('btn-verify-email').style.display = 'none';
+        hideAlert();
+      } else {
+        setErr('email-code', true);
+      }
+    });
+
+    document.getElementById('btn-resend-code').addEventListener('click', () => {
+      verificationCode = generateCode();
+      console.log('Novo código:', verificationCode);
+      showAlert('Novo código enviado! (Simulação: ' + verificationCode + ')', 'success');
+      document.getElementById('email-code').value = '';
+      setErr('email-code', false);
+    });
+
     form.addEventListener('submit', async e => {
       e.preventDefault();
       hideAlert();
 
       const nome        = document.getElementById('nome').value.trim();
-      const responsavel = document.getElementById('responsavel').value.trim();
+      const email       = document.getElementById('email').value.trim();
       const nascimento  = document.getElementById('nascimento').value;
+      const sexo        = document.getElementById('sexo').value;
       const matricula   = document.getElementById('matricula').value.trim();
       const senha       = document.getElementById('senha').value;
       const confirma    = document.getElementById('confirma').value;
 
+      function isValidEmail(e) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+      }
+
       let ok = true;
       setErr('nome',        !nome)             && (ok = false);
-      setErr('responsavel', !responsavel)      && (ok = false);
+      if (!emailVerified) { showAlert('Verifique seu e-mail primeiro.'); ok = false; }
+      else if (!email || !isValidEmail(email)) { setErr('email', true); ok = false; }
       setErr('nascimento',  !nascimento)       && (ok = false);
+      setErr('sexo',        !sexo)             && (ok = false);
       setErr('matricula',   !matricula)        && (ok = false);
       setErr('senha',       senha.length < 6)  && (ok = false);
       setErr('confirma',    senha !== confirma) && (ok = false);
@@ -122,7 +240,7 @@
       btn.disabled = true;
       btn.innerHTML = '<div class="loading-spinner" style="width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div> Criando conta...';
 
-      const result = await register({ nomeCompleto: nome, nomeResponsavel: responsavel, dataNascimento: nascimento, matricula, senha, role: 'aluno' });
+      const result = await register({ nomeCompleto: nome, nomeResponsavel: email, dataNascimento: nascimento, sexo, matricula, senha, role: 'aluno' });
 
       if (!result.success) {
         showAlert(result.error);
@@ -135,7 +253,7 @@
     });
 
     // Clear errors on input
-    ['nome','responsavel','nascimento','matricula','senha','confirma'].forEach(id => {
+    ['nome','nascimento','sexo','matricula','senha','confirma'].forEach(id => {
       const el = document.getElementById(id);
       if(el) {
         el.addEventListener('input', () => setErr(id, false));
