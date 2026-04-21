@@ -37,7 +37,7 @@ const OLYMPIADS = [
   { id:'obr',        acronym:'OBR',                     name:'Olimpíada Brasileira de Robótica',                                     area:'Robótica / Tecnologia', deadline:'25/05/2026', status:'inscricoes-fechadas', phases:3, fee:'Gratuita', level:'Fund. e Médio',          c1:'#2563eb',c2:'#1d4ed8' },
   { id:'onc',        acronym:'ONC',                     name:'Olimpíada Nacional de Ciências',                                       area:'Ciências',             deadline:'12/06/2026', status:'inscricoes-abertas',  phases:2, fee:'Gratuita', level:'Fund. e Médio',          c1:'#0891b2',c2:'#0e7490' },
   { id:'oceano',     acronym:'OLIMPÍADA DO OCEANO',     name:'Olimpíada do Oceano',                                                   area:'Ciências Ambientais',  deadline:'30/07/2026', status:'inscricoes-fechadas', phases:2, fee:'Gratuita', level:'Fundamental II e Médio', c1:'#0284c7',c2:'#0369a1' },
-  { id:'tff',        acronym:'TORNEIO FEMININO DE FÍSICA',name:'Torneio Feminino de Física',                                         area:'Física',               deadline:'22/06/2026', status:'inscricoes-abertas',  phases:2, fee:'Gratuita', level:'Ensino Médio',           c1:'#db2777',c2:'#be185d' },
+  { id:'tff',        acronym:'TORNEIO FEMININO DE FÍSICA',name:'Torneio Feminino de Física',                                         area:'Física',               deadline:'22/06/2026', status:'inscricoes-abertas',  phases:2, fee:'Gratuita', level:'Ensino Médio',           c1:'#db2777',c2:'#be185d', femaleOnly:true },
   { id:'canguru',    acronym:'CANGURU',                 name:'Canguru de Matemática Brasil',                                         area:'Matemática',           deadline:'18/05/2026', status:'em-andamento',        phases:1, fee:'Gratuita', level:'Fund. e Médio',          c1:'#ea580c',c2:'#c2410c' },
   { id:'obsma',      acronym:'OBSMA',                   name:'Olimpíada Brasileira de Saúde e Meio Ambiente',                        area:'Saúde / Meio Ambiente', deadline:'28/06/2026', status:'inscricoes-fechadas', phases:3, fee:'Gratuita', level:'Ensino Médio',           c1:'#16a34a',c2:'#15803d' },
   { id:'obmep',      acronym:'OBMEP',                   name:'Olimpíada Brasileira de Matemática das Escolas Públicas',              area:'Matemática',           deadline:'30/06/2026', status:'inscricoes-abertas',  phases:2, fee:'Gratuita', level:'Fund. II e Médio',       c1:'#dc2626',c2:'#b91c1c' },
@@ -45,7 +45,7 @@ const OLYMPIADS = [
   { id:'obi',        acronym:'OBI',                     name:'Olimpíada Brasileira de Informática',                                  area:'Informática',          deadline:'05/08/2026', status:'inscricoes-abertas',  phases:3, fee:'Gratuita', level:'Fund. e Médio',          c1:'#0369a1',c2:'#075985' },
   { id:'obqjr',      acronym:'OBQJr',                   name:'Olimpíada Brasileira de Química Júnior',                               area:'Química',              deadline:'20/07/2026', status:'inscricoes-fechadas', phases:2, fee:'Gratuita', level:'Fundamental II',         c1:'#9333ea',c2:'#7e22ce' },
   { id:'matdiv',     acronym:'MATEMÁTICOS POR DIVERSÃO',name:'Matemáticos por Diversão',                                            area:'Matemática',           deadline:'10/07/2026', status:'inscricoes-fechadas', phases:2, fee:'Gratuita', level:'Fund. e Médio',          c1:'#f59e0b',c2:'#d97706' },
-  { id:'quimeninas', acronym:'QUIMENINAS',              name:'Quimeninas — Olimpíada de Química para Meninas',                       area:'Química',              deadline:'14/06/2026', status:'inscricoes-abertas',  phases:2, fee:'Gratuita', level:'Ensino Médio',           c1:'#ec4899',c2:'#db2777' },
+  { id:'quimeninas', acronym:'QUIMENINAS',              name:'Quimeninas — Olimpíada de Química para Meninas',                       area:'Química',              deadline:'14/06/2026', status:'inscricoes-abertas',  phases:2, fee:'Gratuita', level:'Ensino Médio',           c1:'#ec4899',c2:'#db2777', femaleOnly:true },
   { id:'olimplit',   acronym:'OLIMPÍADA DE LITERATURA', name:'Olimpíada de Literatura',                                              area:'Literatura',           deadline:'08/07/2026', status:'inscricoes-fechadas', phases:2, fee:'Gratuita', level:'Ensino Médio',           c1:'#8b5cf6',c2:'#7c3aed' },
   { id:'purple',     acronym:'PURPLE COMET',            name:'Purple Comet Math Meet',                                               area:'Matemática',           deadline:'02/06/2026', status:'em-andamento',        phases:1, fee:'Gratuita', level:'Fund. e Médio',          c1:'#a855f7',c2:'#9333ea' },
   { id:'oba',        acronym:'OBA',                     name:'Olimpíada Brasileira de Astronomia e Astronáutica',                   area:'Astronomia',           deadline:'15/05/2026', status:'encerrada',           phases:2, fee:'Gratuita', level:'Fund. e Médio',          c1:'#1e40af',c2:'#1e3a8a' },
@@ -170,18 +170,42 @@ function handleEnroll(id) {
   const o = OLYMPIADS.find(x => x.id === id);
   if (!o || o.status === 'encerrada') return;
   const user = getCurrentUser();
-  const nowEnrolled = toggleEnroll(id);
   
-  if (nowEnrolled) {
-    saveEnrollmentToSheet({ userId: user.id, userName: user.nomeCompleto, userMatricula: user.matricula, olympiadId: id, olympiadName: o.name, olympiadAcronym: o.acronym });
-  } else {
+  if (o.femaleOnly && user.sexo !== 'feminino') {
+    alert('Esta olimpíada é exclusiva para pessoas do sexo feminino.');
+    return;
   }
   
-  const card = document.getElementById('card-' + id);
-  const btn  = document.getElementById('btn-' + id);
-  const top  = card.querySelector('.card-top');
+  const currentlyEnrolled = isEnrolled(id);
+  
+  if (currentlyEnrolled) {
+    const cancelData = { userId: user.id, olympiadId: id };
+    toggleEnroll(id);
+    updateCardUI(id, false);
+    updateCounts();
+    cancelEnrollmentFromSheet(cancelData).then(result => {
+      if (result && !result.ok) {
+        console.warn('Erro ao cancelar na planilha: ' + (result?.erro || 'Erro desconhecido'));
+      }
+    });
+  } else {
+    toggleEnroll(id);
+    updateCardUI(id, true);
+    updateCounts();
+    saveEnrollmentToSheet({ action: 'inscrever', userId: user.id, userName: user.nomeCompleto, userMatricula: user.codigoMatricula, olympiadId: id, olympiadName: o.name, olympiadAcronym: o.acronym }).then(result => {
+      if (result && !result.ok) {
+        console.warn('Erro ao salvar na planilha: ' + (result?.erro || 'Erro desconhecido'));
+      }
+    });
+  }
+}
 
-  if (nowEnrolled) {
+function updateCardUI(id, enrolled) {
+  const card = document.getElementById('card-' + id);
+  const btn = document.getElementById('btn-' + id);
+  const top = card.querySelector('.card-top');
+  
+  if (enrolled) {
     card.classList.add('enrolled');
     btn.classList.add('enrolled');
     btn.textContent = '✓ Inscrito';
@@ -197,18 +221,45 @@ function handleEnroll(id) {
     const eb = top.querySelector('.enrolled-badge');
     if (eb) eb.remove();
   }
-  updateCounts();
 }
 
 async function saveEnrollmentToSheet(data) {
-  if (!apiConfigurada()) return;
+  console.log('Salvando inscrição:', data);
+  if (!apiConfigurada()) {
+    console.warn('API não configurada');
+    return { ok: false, erro: 'API não configurada' };
+  }
   try {
-    await fetch(API_URL, {
+    const res = await fetch(API_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'inscrever', ...data })
+      body: JSON.stringify(data)
     });
+    const result = await res.json();
+    console.log('Resposta do salvamento:', result);
+    return result;
   } catch (err) {
-    console.warn('Erro ao salvar inscrição:', err);
+    console.error('Erro ao salvar inscrição:', err);
+    return { ok: false, erro: err.message };
+  }
+}
+
+async function cancelEnrollmentFromSheet(data) {
+  console.log('Cancelando inscrição:', data);
+  if (!apiConfigurada()) {
+    console.warn('API não configurada');
+    return { ok: false, erro: 'API não configurada' };
+  }
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'cancelar', ...data })
+    });
+    const result = await res.json();
+    console.log('Resposta do cancelamento:', result);
+    return result;
+  } catch (err) {
+    console.error('Erro ao cancelar inscrição:', err);
+    return { ok: false, erro: err.message };
   }
 }
 
@@ -308,19 +359,70 @@ function renderAdminTableData(records) {
   }
 
   empty.style.display = 'none';
+  const formatDate = (d) => {
+    if (!d || d === '-') return '-';
+    if (d instanceof Date && !isNaN(d)) {
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const ano = d.getFullYear();
+      return `${dia}/${mes}/${ano}`;
+    }
+    if (typeof d === 'string' && d.includes('GMT')) {
+      const parsed = new Date(d);
+      if (!isNaN(parsed)) {
+        const dia = String(parsed.getDate()).padStart(2, '0');
+        const mes = String(parsed.getMonth() + 1).padStart(2, '0');
+        const ano = parsed.getFullYear();
+        return `${dia}/${mes}/${ano}`;
+      }
+    }
+    if (d.includes('/')) return d.split(',')[0];
+    if (d.includes('-') && d.length === 10) {
+      const parts = d.split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return d;
+  };
   tbody.innerHTML = records.map(r => `<tr>
     <td>${r.userName}</td>
     <td>${r.userMatricula}</td>
+    <td>${r.email || '-'}</td>
+    <td>${formatDate(r.dataNascimento)}</td>
+    <td>${r.sexo || '-'}</td>
     <td>${r.olympiadAcronym}</td>
-    <td>${r.timestamp}</td>
+    <td>${formatDate(r.timestamp)}</td>
   </tr>`).join('');
 }
 
 function exportToCSV() {
   if (allEnrollmentsFromSheet.length === 0) return;
 
-  const csv = 'Aluno,Matrícula,Olimpíada,Data\r\n' + allEnrollmentsFromSheet.map(r => 
-    `${r.userName},${r.userMatricula},${r.olympiadAcronym},${r.timestamp}`
+  const formatDateForCsv = (d) => {
+    if (!d || d === '-') return '';
+    if (d instanceof Date && !isNaN(d)) {
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const ano = d.getFullYear();
+      return `${dia}/${mes}/${ano}`;
+    }
+    if (typeof d === 'string' && d.includes('GMT')) {
+      const parsed = new Date(d);
+      if (!isNaN(parsed)) {
+        const dia = String(parsed.getDate()).padStart(2, '0');
+        const mes = String(parsed.getMonth() + 1).padStart(2, '0');
+        const ano = parsed.getFullYear();
+        return `${dia}/${mes}/${ano}`;
+      }
+    }
+    if (d.includes('/')) return d.split(',')[0];
+    if (d.includes('-') && d.length === 10) {
+      const parts = d.split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return d;
+  };
+  const csv = 'Aluno,Matrícula,E-mail,DataNasc,Sexo,Olimpíada,Data\r\n' + allEnrollmentsFromSheet.map(r => 
+    `${r.userName},${r.userMatricula},${r.email || ''},${formatDateForCsv(r.dataNascimento)},${r.sexo || ''},${r.olympiadAcronym},${formatDateForCsv(r.timestamp)}`
   ).join('\r\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

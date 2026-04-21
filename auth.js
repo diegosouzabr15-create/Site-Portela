@@ -2,7 +2,7 @@
 //  auth.js — Autenticação com Google Sheets como banco de dados
 //  ⚠️  Após publicar o Apps Script, cole a URL abaixo:
 // =============================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbwayF64KudbPXQbIH3XoiSMqA1RWublRT-FcEFy9I21eIs20axtBMkhq4o4L5CRLC9cbg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycby6jjGzRNgeF2IWxA9V8OWyVx5ahB3Jl8JCmI-6FqVz6quKDVBlDaTk0_sBEh0UEfUEdg/exec';
 
 const SESSION_KEY = 'olimpiadas_session';
 const LOCAL_KEY = 'olimpiadas_users';
@@ -49,20 +49,21 @@ function requireAuth() {
 // -------------------------------------------------------------
 //  CADASTRO
 // -------------------------------------------------------------
-async function register({ nomeCompleto, nomeResponsavel, email, dataNascimento, matricula, senha, role = 'aluno', adminKey = '', nomeEscola = '' }) {
+async function register({ nomeCompleto, email, dataNascimento, sexo, codigoMatricula, senha, role = 'aluno', adminKey = '', nomeEscola = '' }) {
 
   // ── Via Google Sheets ──────────────────────────────────────
   if (apiConfigurada()) {
     try {
+      console.log('Enviando dados para API:', { action: 'cadastrar', nomeCompleto, email, dataNascimento, sexo, codigoMatricula });
       const res = await fetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'cadastrar',
           nomeCompleto,
-          nomeResponsavel,
           email,
           dataNascimento,
-          matricula,
+          sexo,
+          codigoMatricula,
           senhaHash: hashSimples(senha),
           role,
           adminKey,
@@ -70,22 +71,23 @@ async function register({ nomeCompleto, nomeResponsavel, email, dataNascimento, 
         })
       });
       const data = await res.json();
+      console.log('Resposta da API:', data);
       if (data.ok) {
-        // Salva sessão com os dados retornados pela API
-        const user = { id: data.id, nomeCompleto, nomeResponsavel, email, dataNascimento, matricula, nomeEscola, inscricoes: [], role: data.role };
+        const user = { id: data.id, nomeCompleto, email, dataNascimento, sexo, codigoMatricula, nomeEscola, inscricoes: [], role: data.role };
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));
         return { success: true, user };
       }
       return { success: false, error: data.erro };
     } catch (err) {
+      console.error('Erro na API:', err);
       console.warn('API indisponível, usando localStorage:', err);
     }
   }
 
   // ── Fallback: localStorage ─────────────────────────────────
   const users = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
-  if (users.find(u => u.matricula === matricula)) {
-    return { success: false, error: 'Já existe uma conta com essa matrícula.' };
+  if (users.find(u => u.codigoMatricula === codigoMatricula)) {
+    return { success: false, erro: 'Já existe uma conta com esse código de matrícula.' };
   }
 
   if (role === 'admin' && adminKey !== 'ADMIN2026') {
@@ -94,7 +96,7 @@ async function register({ nomeCompleto, nomeResponsavel, email, dataNascimento, 
 
   const user = {
     id: 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-    nomeCompleto, nomeResponsavel, email, dataNascimento, matricula,
+    nomeCompleto, email, dataNascimento, sexo, codigoMatricula,
     senhaHash: hashSimples(senha),
     role: role,
     inscricoes: [],
@@ -130,43 +132,68 @@ async function registerAdmin({ nomeCompleto, nomeEscola, senha, adminKey }) {
       console.warn('API indisponível:', err);
     }
   }
-  return { success: false, error: 'API não configurada.' };
+
+  // Fallback: localStorage
+  if (adminKey !== 'ADMIN2026') {
+    return { success: false, error: 'Chave de acesso administrativo inválida.' };
+  }
+
+  const users = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+  if (users.find(u => u.nomeEscola === nomeEscola && u.role === 'admin')) {
+    return { success: false, error: 'Já existe um admin para esta escola.' };
+  }
+
+  const user = {
+    id: 'admin_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    nomeCompleto,
+    nomeEscola,
+    senhaHash: hashSimples(senha),
+    role: 'admin',
+    inscricoes: [],
+    createdAt: new Date().toISOString()
+  };
+  users.push(user);
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(users));
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  return { success: true, user };
 }
 
 // -------------------------------------------------------------
 //  LOGIN
 // -------------------------------------------------------------
-async function login(matricula, senha) {
+async function login(codigoMatricula, senha) {
 
   // ── Via Google Sheets ──────────────────────────────────────
   if (apiConfigurada()) {
     try {
+      console.log('Tentando login com API...');
       const res = await fetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'login',
-          matricula,
+          codigoMatricula,
           senhaHash: hashSimples(senha)
         })
       });
       const data = await res.json();
+      console.log('Resposta login:', data);
       if (data.ok) {
         localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
         return { success: true, user: data.usuario };
       }
       return { success: false, error: data.erro };
     } catch (err) {
+      console.error('Erro na API:', err);
       console.warn('API indisponível, usando localStorage:', err);
     }
   }
 
   // ── Fallback: localStorage ─────────────────────────────────
   const users = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
-  const user = users.find(u => u.matricula === matricula && u.senhaHash === hashSimples(senha));
-  // Suporte a contas antigas que salvaram senha em texto puro
-  const userLegacy = !user ? users.find(u => u.matricula === matricula && u.senha === senha) : null;
+  const user = users.find(u => u.codigoMatricula === codigoMatricula && u.senhaHash === hashSimples(senha));
+  const userLegacy = !user ? users.find(u => u.codigoMatricula === codigoMatricula && u.senha === senha) : null;
   const found = user || userLegacy;
-  if (!found) return { success: false, error: 'Matrícula ou senha incorretos.' };
+  if (!found) return { success: false, error: 'Código de matrícula ou senha incorretos.' };
   localStorage.setItem(SESSION_KEY, JSON.stringify(found));
   return { success: true, user: found };
 }
