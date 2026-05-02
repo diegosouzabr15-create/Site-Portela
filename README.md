@@ -142,4 +142,4 @@ Projeto desenvolvido como um portal de acesso às olimpíadas das escolas públi
 
 ---
 
-*Ultima atualizacao: Abril de 2026*
+*Ultima atualizacao: Maio de 2026*

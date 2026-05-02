@@ -56,12 +56,16 @@ const OLYMPIADS = [
   { id:'obf',        acronym:'OBF',                     name:'Olimpíada Brasileira de Física',                                       area:'Física',               deadline:'10/08/2026', status:'inscricoes-abertas',  phases:3, fee:'Gratuita', level:'Ensino Médio',           c1:'#1e293b',c2:'#0f172a' }
 ];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const user = requireAuth();
   if (!user) return;
 
   document.getElementById('user-name').textContent = user.nomeCompleto;
   document.getElementById('btn-logout').addEventListener('click', logout);
+
+  if (apiConfigurada()) {
+    await syncConfirmedEnrollments();
+  }
   updateCounts();
 
   // Admin Features
@@ -91,8 +95,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function updateCounts() {
   const user = getCurrentUser();
-  document.getElementById('enrolled-count').textContent = (user?.inscricoes || []).length;
+  const confirmedCount = (user?.inscricoes || []).filter(e => {
+    const entry = typeof e === 'string' ? { status: 'confirmada' } : e;
+    return entry.status === 'confirmada';
+  }).length;
+  document.getElementById('enrolled-count').textContent = confirmedCount;
   document.getElementById('total-count').textContent = OLYMPIADS.length;
+}
+
+async function syncConfirmedEnrollments() {
+  if (!apiConfigurada()) return;
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'listarInscricoes' })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const user = getCurrentUser();
+      if (!user) return;
+      const confirmed = data.inscricoes.filter(e => e.userId === user.id && e.status === 'confirmada');
+      const pending = data.inscricoes.filter(e => e.userId === user.id && e.status === 'pendente');
+      user.inscricoes = [
+        ...confirmed.map(e => ({ id: e.olympiadId, status: 'confirmada' })),
+        ...pending.map(e => ({ id: e.olympiadId, status: 'pendente' }))
+      ];
+      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    }
+  } catch (err) {
+    console.warn('Erro ao sincronizar inscrições:', err);
+  }
 }
 
 function applyFilters() {
@@ -121,14 +153,25 @@ function renderCards(list) {
   grid.innerHTML = list.map((o, i) => {
     const user = getCurrentUser();
     const enrolled = isEnrolled(o.id);
+    const confirmed = hasConfirmedEnrollment(o.id);
     const statusLabel = STATUS_LABELS[o.status] || o.status;
     const banner = makeBanner(o.acronym, o.c1, o.c2);
     const isAdmin = user?.role === 'admin';
+    const isOpen = o.status === 'inscricoes-abertas';
     
     let enrollCount = 0;
     if (isAdmin && allEnrollmentsFromSheet.length > 0) {
       enrollCount = allEnrollmentsFromSheet.filter(e => e.olympiadId === o.id).length;
     }
+    
+    let enrollmentBadge = '';
+    if (confirmed) enrollmentBadge = '<span class="enrolled-badge" aria-label="Inscrito nesta olimpíada">✓ Inscrito</span>';
+    else if (enrolled) enrollmentBadge = '<span class="pending-badge" aria-label="Aguardando confirmação">⏳ Pendente</span>';
+    
+    let btnText = 'Solicitar inscrição';
+    let btnClass = 'btn-enroll';
+    if (confirmed) { btnText = '✓ Inscrito'; btnClass = 'btn-enroll enrolled'; }
+    else if (enrolled) { btnText = '⏳ Pendente'; btnClass = 'btn-enroll pending'; }
     
     return `
     <article class="olympiad-card status-${o.status} ${enrolled ? 'enrolled' : ''}" id="card-${o.id}" style="animation-delay:${i * 0.035}s" aria-label="${o.name} - ${statusLabel}">
@@ -138,7 +181,7 @@ function renderCards(list) {
       <div class="card-content">
         <div class="card-top">
           <span class="status-badge status-${o.status}" role="status" aria-label="Status: ${statusLabel}">${statusLabel}</span>
-          ${enrolled ? '<span class="enrolled-badge" aria-label="Inscrito nesta olimpíada">✓ Inscrito</span>' : ''}
+          ${enrollmentBadge}
         </div>
         <div class="card-acronym" aria-hidden="true">${o.acronym}</div>
         <h3 class="card-title">${o.name}</h3>
@@ -155,9 +198,10 @@ function renderCards(list) {
               📋 Checar pedidos ${enrollCount > 0 ? `<span class="badge-count" aria-label="${enrollCount} pedidos">${enrollCount}</span>` : ''}
             </button>
           ` : `
-            <button class="btn-enroll ${enrolled ? 'enrolled' : ''}" id="btn-${o.id}" onclick="handleEnroll('${o.id}')"
-              ${o.status === 'encerrada' ? 'disabled aria-disabled="true" aria-label="Olimpíada encerrada"' : 'aria-label="' + (enrolled ? 'Cancelar inscrição na ' : 'Inscrever-se na ') + o.name + '"'}>
-              ${enrolled ? '✓ Inscrito' : o.status === 'encerrada' ? 'Encerrada' : 'Inscrever-se'}
+            <button class="${btnClass}" id="btn-${o.id}" onclick="handleEnroll('${o.id}')"
+              ${(confirmed || (enrolled && isOpen) || (!enrolled && isOpen)) ? '' : 'disabled aria-disabled="true"'}
+              aria-label="${confirmed ? 'Cancelar inscrição na ' + o.name : enrolled ? 'Cancelar solicitação na ' + o.name : isOpen ? 'Solicitar inscrição na ' + o.name : 'Inscrições encerradas para ' + o.name}">
+              ${confirmed ? '✓ Inscrito' : enrolled ? '⏳ Pendente' : isOpen ? 'Solicitar inscrição' : 'Inscrições fechadas'}
             </button>
           `}
         </div>
@@ -168,7 +212,7 @@ function renderCards(list) {
 
 function handleEnroll(id) {
   const o = OLYMPIADS.find(x => x.id === id);
-  if (!o || o.status === 'encerrada') return;
+  if (!o || o.status !== 'inscricoes-abertas') return;
   const user = getCurrentUser();
   
   if (o.femaleOnly && user.sexo !== 'feminino') {
@@ -177,20 +221,33 @@ function handleEnroll(id) {
   }
   
   const currentlyEnrolled = isEnrolled(id);
+  const isConfirmed = hasConfirmedEnrollment(id);
   
-  if (currentlyEnrolled) {
+  if (currentlyEnrolled && isConfirmed) {
     const cancelData = { userId: user.id, olympiadId: id };
-    toggleEnroll(id);
-    updateCardUI(id, false);
+    removeEnrollment(id);
+    renderCards(OLYMPIADS);
     updateCounts();
     cancelEnrollmentFromSheet(cancelData).then(result => {
       if (result && !result.ok) {
         console.warn('Erro ao cancelar na planilha: ' + (result?.erro || 'Erro desconhecido'));
       }
     });
+  } else if (currentlyEnrolled && !isConfirmed) {
+    if (confirm('Cancelar a solicitação de inscrição?')) {
+      const cancelData = { userId: user.id, olympiadId: id };
+      removeEnrollment(id);
+      renderCards(OLYMPIADS);
+      updateCounts();
+      cancelEnrollmentFromSheet(cancelData).then(result => {
+        if (result && !result.ok) {
+          console.warn('Erro ao cancelar na planilha: ' + (result?.erro || 'Erro desconhecido'));
+        }
+      });
+    }
   } else {
-    toggleEnroll(id);
-    updateCardUI(id, true);
+    addEnrollment(id);
+    renderCards(OLYMPIADS);
     updateCounts();
     saveEnrollmentToSheet({ action: 'inscrever', userId: user.id, userName: user.nomeCompleto, userMatricula: user.codigoMatricula, olympiadId: id, olympiadName: o.name, olympiadAcronym: o.acronym }).then(result => {
       if (result && !result.ok) {
@@ -200,66 +257,35 @@ function handleEnroll(id) {
   }
 }
 
-function updateCardUI(id, enrolled) {
-  const card = document.getElementById('card-' + id);
-  const btn = document.getElementById('btn-' + id);
-  const top = card.querySelector('.card-top');
+function addEnrollment(olympiadId) {
+  const user = getCurrentUser();
+  if (!user) return;
+  const list = user.inscricoes || [];
+  if (!list.some(e => (typeof e === 'string' ? e : e.id) === olympiadId)) {
+    list.push({ id: olympiadId, status: 'pendente' });
+    user.inscricoes = list;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  }
+}
+
+function removeEnrollment(olympiadId) {
+  const user = getCurrentUser();
+  if (!user) return;
+  user.inscricoes = (user.inscricoes || []).filter(e => (typeof e === 'string' ? e : e.id) !== olympiadId);
+  localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+}
+
+function showEnrollmentsFor(olympiadId) {
+  const adminPanel = document.getElementById('admin-panel');
+  const mainGrid = document.getElementById('main-grid');
+  document.getElementById('admin-olympiad-filter').value = olympiadId;
+  adminPanel.style.display = 'block';
+  mainGrid.style.display = 'none';
   
-  if (enrolled) {
-    card.classList.add('enrolled');
-    btn.classList.add('enrolled');
-    btn.textContent = '✓ Inscrito';
-    if (!top.querySelector('.enrolled-badge')) {
-      const b = document.createElement('span');
-      b.className = 'enrolled-badge'; b.textContent = '✓ Inscrito';
-      top.appendChild(b);
-    }
+  if (allEnrollmentsFromSheet.length === 0) {
+    loadAdminEnrollments();
   } else {
-    card.classList.remove('enrolled');
-    btn.classList.remove('enrolled');
-    btn.textContent = 'Inscrever-se';
-    const eb = top.querySelector('.enrolled-badge');
-    if (eb) eb.remove();
-  }
-}
-
-async function saveEnrollmentToSheet(data) {
-  console.log('Salvando inscrição:', data);
-  if (!apiConfigurada()) {
-    console.warn('API não configurada');
-    return { ok: false, erro: 'API não configurada' };
-  }
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-    const result = await res.json();
-    console.log('Resposta do salvamento:', result);
-    return result;
-  } catch (err) {
-    console.error('Erro ao salvar inscrição:', err);
-    return { ok: false, erro: err.message };
-  }
-}
-
-async function cancelEnrollmentFromSheet(data) {
-  console.log('Cancelando inscrição:', data);
-  if (!apiConfigurada()) {
-    console.warn('API não configurada');
-    return { ok: false, erro: 'API não configurada' };
-  }
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'cancelar', ...data })
-    });
-    const result = await res.json();
-    console.log('Resposta do cancelamento:', result);
-    return result;
-  } catch (err) {
-    console.error('Erro ao cancelar inscrição:', err);
-    return { ok: false, erro: err.message };
+    renderAdminTableData(allEnrollmentsFromSheet.filter(r => r.olympiadId === olympiadId));
   }
 }
 
@@ -318,10 +344,10 @@ async function loadAdminEnrollments() {
   const tbody = document.getElementById('admin-tbody');
   const empty = document.getElementById('admin-empty');
   
-  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Carregando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center">Carregando...</td></tr>';
   
   if (!apiConfigurada()) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#dc2626">API não configurada. Configure o Google Apps Script.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#dc2626">API não configurada. Configure o Google Apps Script.</td></tr>';
     return;
   }
 
@@ -335,10 +361,10 @@ async function loadAdminEnrollments() {
       allEnrollmentsFromSheet = data.inscricoes;
       renderAdminTableData(allEnrollmentsFromSheet);
     } else {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#dc2626">Erro ao carregar: ' + data.erro + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#dc2626">Erro ao carregar: ' + data.erro + '</td></tr>';
     }
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#dc2626">Erro de conexão</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#dc2626">Erro de conexão</td></tr>';
   }
 }
 
@@ -391,6 +417,12 @@ function renderAdminTableData(records) {
     <td>${r.sexo || '-'}</td>
     <td>${r.olympiadAcronym}</td>
     <td>${formatDate(r.timestamp)}</td>
+    <td><span class="status-badge ${r.status === 'confirmada' ? 'confirmed' : 'pending'}">${r.status === 'confirmada' ? 'Confirmada' : 'Pendente'}</span></td>
+    <td>
+      ${r.status !== 'confirmada' ? `
+        <button class="btn-confirm-enroll" onclick="confirmEnrollment('${r.userId}', '${r.olympiadId}', '${r.userName}')" title="Confirmar inscrição">Confirmar</button>
+      ` : ''}
+    </td>
   </tr>`).join('');
 }
 
@@ -421,8 +453,8 @@ function exportToCSV() {
     }
     return d;
   };
-  const csv = 'Aluno,Matrícula,E-mail,DataNasc,Sexo,Olimpíada,Data\r\n' + allEnrollmentsFromSheet.map(r => 
-    `${r.userName},${r.userMatricula},${r.email || ''},${formatDateForCsv(r.dataNascimento)},${r.sexo || ''},${r.olympiadAcronym},${formatDateForCsv(r.timestamp)}`
+  const csv = 'Aluno,Matrícula,E-mail,DataNasc,Sexo,Olimpíada,Data,Status\r\n' + allEnrollmentsFromSheet.map(r => 
+    `${r.userName},${r.userMatricula},${r.email || ''},${formatDateForCsv(r.dataNascimento)},${r.sexo || ''},${r.olympiadAcronym},${formatDateForCsv(r.timestamp)},${r.status === 'confirmada' ? 'Confirmada' : 'Pendente'}`
   ).join('\r\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -434,16 +466,95 @@ function exportToCSV() {
   URL.revokeObjectURL(url);
 }
 
-function showEnrollmentsFor(olympiadId) {
-  const adminPanel = document.getElementById('admin-panel');
-  const mainGrid = document.getElementById('main-grid');
-  document.getElementById('admin-olympiad-filter').value = olympiadId;
-  adminPanel.style.display = 'block';
-  mainGrid.style.display = 'none';
-  
-  if (allEnrollmentsFromSheet.length === 0) {
+async function confirmEnrollment(userId, olympiadId, userName) {
+  if (!confirm(`Confirmar a inscrição de ${userName}?`)) return;
+  const result = await saveEnrollmentToSheet({ action: 'confirmar', userId, olympiadId });
+  if (result.ok) {
     loadAdminEnrollments();
+    loadAdminEnrollmentsCount();
   } else {
-    renderAdminTableData(allEnrollmentsFromSheet.filter(r => r.olympiadId === olympiadId));
+    alert('Erro ao confirmar: ' + (result.erro || 'desconhecido'));
+  }
+}
+
+async function removeEnrollmentAdmin(userId, olympiadId, userName) {
+  if (!confirm(`Remover o pedido de inscrição de ${userName}?`)) return;
+  const result = await saveEnrollmentToSheet({ action: 'remover', userId, olympiadId });
+  if (result.ok) {
+    loadAdminEnrollments();
+    loadAdminEnrollmentsCount();
+  } else {
+    alert('Erro ao remover: ' + (result.erro || 'desconhecido'));
+  }
+}
+
+async function saveEnrollmentToSheet(data) {
+  console.log('Salvando:', data);
+  if (!apiConfigurada()) {
+    console.warn('API não configurada');
+    return { ok: false, erro: 'API não configurada' };
+  }
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    return await res.json();
+  } catch (err) {
+    console.error('Erro:', err);
+    return { ok: false, erro: err.message };
+  }
+}
+
+async function cancelEnrollmentFromSheet(data) {
+  if (!apiConfigurada()) return { ok: false };
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'cancelar', ...data })
+    });
+    return await res.json();
+  } catch (err) {
+    return { ok: false, erro: err.message };
+  }
+}
+
+async function saveEnrollmentToSheet(data) {
+  console.log('Salvando inscrição:', data);
+  if (!apiConfigurada()) {
+    console.warn('API não configurada');
+    return { ok: false, erro: 'API não configurada' };
+  }
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    console.log('Resposta do salvamento:', result);
+    return result;
+  } catch (err) {
+    console.error('Erro ao salvar inscrição:', err);
+    return { ok: false, erro: err.message };
+  }
+}
+
+async function cancelEnrollmentFromSheet(data) {
+  console.log('Cancelando inscrição:', data);
+  if (!apiConfigurada()) {
+    console.warn('API não configurada');
+    return { ok: false, erro: 'API não configurada' };
+  }
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'cancelar', ...data })
+    });
+    const result = await res.json();
+    console.log('Resposta do cancelamento:', result);
+    return result;
+  } catch (err) {
+    console.error('Erro ao cancelar inscrição:', err);
+    return { ok: false, erro: err.message };
   }
 }

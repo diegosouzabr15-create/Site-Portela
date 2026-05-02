@@ -2,7 +2,7 @@
 //  auth.js — Autenticação com Google Sheets como banco de dados
 //  ⚠️  Após publicar o Apps Script, cole a URL abaixo:
 // =============================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycby6jjGzRNgeF2IWxA9V8OWyVx5ahB3Jl8JCmI-6FqVz6quKDVBlDaTk0_sBEh0UEfUEdg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyWuh2-WTrPxwv3GX77mxTVhVgy3t5w0qlZhy40oq3b6NKO2JtanOOGKiB3OIvvy8IdUw/exec';
 
 const SESSION_KEY = 'olimpiadas_session';
 const LOCAL_KEY = 'olimpiadas_users';
@@ -194,8 +194,12 @@ async function login(codigoMatricula, senha) {
   const userLegacy = !user ? users.find(u => u.codigoMatricula === codigoMatricula && u.senha === senha) : null;
   const found = user || userLegacy;
   if (!found) return { success: false, error: 'Código de matrícula ou senha incorretos.' };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(found));
-  return { success: true, user: found };
+  const sessionUser = { ...found };
+  if (!Array.isArray(sessionUser.inscricoes)) {
+    sessionUser.inscricoes = [];
+  }
+  localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+  return { success: true, user: sessionUser };
 }
 
 // -------------------------------------------------------------
@@ -250,5 +254,35 @@ function toggleEnroll(olympiadId) {
 
 function isEnrolled(olympiadId) {
   const user = getCurrentUser();
-  return user ? (user.inscricoes || []).includes(olympiadId) : false;
+  if (!user) return false;
+  const list = user.inscricoes || [];
+  return list.some(e => {
+    if (typeof e === 'string') return e === olympiadId;
+    return e.id === olympiadId;
+  });
+}
+
+function hasConfirmedEnrollment(olympiadId) {
+  const user = getCurrentUser();
+  if (!user) return false;
+  const list = user.inscricoes || [];
+  return list.some(e => {
+    const entry = typeof e === 'string' ? { id: e, status: 'confirmada' } : e;
+    return entry.id === olympiadId && entry.status === 'confirmada';
+  });
+}
+
+function setEnrollmentStatus(olympiadId, status) {
+  const user = getCurrentUser();
+  if (!user) return;
+  const list = user.inscricoes || [];
+  const pos = list.findIndex(e => {
+    const entry = typeof e === 'string' ? e : e.id;
+    return entry === olympiadId;
+  });
+  if (pos !== -1) {
+    list[pos] = { id: olympiadId, status };
+    user.inscricoes = list;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  }
 }

@@ -20,6 +20,8 @@ function doPost(e) {
     if (action === 'loginAdmin') return verificarLoginAdmin(data);
     if (action === 'inscrever')  return salvarInscricao(data);
     if (action === 'cancelar')   return cancelarInscricao(data);
+    if (action === 'confirmar')  return confirmarInscricao(data);
+    if (action === 'remover')    return removerInscricao(data);
     if (action === 'listarInscricoes') return listarInscricoesAdmin();
 
     return resposta({ ok: false, erro: 'Ação inválida.' });
@@ -96,7 +98,10 @@ function verificarLogin(data) {
       
       for (let j = 1; j < enrollRows.length; j++) {
         if (String(enrollRows[j][1]) === userId) {
-          inscricoes.push(String(enrollRows[j][4]));
+          inscricoes.push({
+            id: String(enrollRows[j][4]),
+            status: String(enrollRows[j][7] || 'pendente')
+          });
         }
       }
       
@@ -171,7 +176,8 @@ function salvarInscricao(data) {
     data.userMatricula,
     data.olympiadId,
     data.olympiadName,
-    data.olympiadAcronym
+    data.olympiadAcronym,
+    'pendente'
   ]);
 
   return resposta({ ok: true, mensagem: 'Inscrição salva com sucesso!' });
@@ -197,6 +203,38 @@ function cancelarInscricao(data) {
   }
 
   return resposta({ ok: false, erro: 'Inscrição não encontrada para o usuário nesta olimpíada.' });
+}
+
+function confirmarInscricao(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_ENROLL);
+  const rows = sheet.getDataRange().getValues();
+  const userId = String(data.userId);
+  const olympiadId = String(data.olympiadId);
+  
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][1]) === userId && String(rows[i][4]) === olympiadId) {
+      sheet.getRange(i + 1, 8).setValue('confirmada');
+      return resposta({ ok: true, mensagem: 'Inscrição confirmada!' });
+    }
+  }
+  
+  return resposta({ ok: false, erro: 'Inscrição não encontrada.' });
+}
+
+function removerInscricao(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_ENROLL);
+  const rows = sheet.getDataRange().getValues();
+  const userId = String(data.userId);
+  const olympiadId = String(data.olympiadId);
+  
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][1]) === userId && String(rows[i][4]) === olympiadId) {
+      sheet.deleteRow(i + 1);
+      return resposta({ ok: true, mensagem: 'Pedido removido.' });
+    }
+  }
+  
+  return resposta({ ok: false, erro: 'Inscrição não encontrada.' });
 }
 
 // ── LISTAR INSCRIÇÕES (ADMIN) ────────────────────────────────
@@ -248,9 +286,16 @@ function listarInscricoesAdmin() {
       olympiadAcronym: enrollRows[i][6],
       email: email,
       dataNascimento: dataNascimento,
-      sexo: sexo
+      sexo: sexo,
+      status: enrollRows[i][7] || 'pendente'
     });
   }
+  
+  inscricoes.sort((a, b) => {
+    if (a.status === 'pendente' && b.status === 'confirmada') return -1;
+    if (a.status === 'confirmada' && b.status === 'pendente') return 1;
+    return 0;
+  });
   
   return resposta({ ok: true, inscricoes: inscricoes });
 }
