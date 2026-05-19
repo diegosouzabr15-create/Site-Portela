@@ -1,4 +1,4 @@
-# Portal OlimpIA Portela
+# Portal OlímpIA Portela
 
 Uma aplicacao web para estudantes da rede publica se cadastrarem e participarem das principais olimpíadas acadêmicas brasileiras.
 
@@ -6,7 +6,7 @@ Uma aplicacao web para estudantes da rede publica se cadastrarem e participarem 
 
 ## Descricao
 
-O **Portal OlimpIA Portela** e um sistema que permite que estudantes:
+O **Portal OlímpIA Portela** e um sistema que permite que estudantes:
 
 - Se **cadastrem** e facam **login** na plataforma.
 - Visualizem um **dashboard** com 24 olimpíadas disponíveis.
