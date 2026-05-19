@@ -29,6 +29,7 @@
 
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior:smooth; }
+img { max-width: 100%; height: auto; }
 
 /* Skip link for keyboard navigation */
 .skip-link {
@@ -77,12 +78,10 @@ body {
 
 .auth-logo { text-align: center; margin-bottom: 1.75rem; }
 .logo-icon {
-  width: 64px; height: 64px;
-  background: white;
-  border-radius: 18px;
+  width: 80px; height: 80px;
+  background: transparent;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 0.875rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,.15);
   overflow: hidden;
 }
 .logo-icon img {
@@ -202,15 +201,13 @@ body {
 .brand { display: flex; align-items: center; gap: .75rem; }
 .brand-icon {
   width: 40px; height: 40px;
-  background: white;
-  border-radius: 11px;
+  background: transparent;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 10px rgba(0,0,0,.08);
   overflow: hidden;
 }
 .brand-icon img {
-  width: 100%;
-  height: 100%;
+  width: 90%;
+  height: 90%;
   object-fit: contain;
 }
 .brand-name { font-size: .92rem; font-weight: 800; color: var(--text); }
