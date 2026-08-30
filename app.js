@@ -134,14 +134,34 @@ function applyFilters() {
   const list = OLYMPIADS.filter(o => {
     const ms = o.name.toLowerCase().includes(search) || o.acronym.toLowerCase().includes(search);
     const ma = !area   || o.area === area;
-    const mv = !status || o.status === status;
+    const mv = !status || getEffectiveStatus(o) === status;
     return ms && ma && mv;
   });
   document.getElementById('grid-label').textContent = `${list.length} olimpíada${list.length !== 1 ? 's' : ''} encontrada${list.length !== 1 ? 's' : ''}`;
   renderCards(list);
 }
 
+const STATUS_ORDER = {
+  'inscricoes-abertas':  1,
+  'em-andamento':        2,
+  'inscricoes-fechadas': 3,
+  'encerrada':           4
+};
+
+function getEffectiveStatus(o) {
+  const [d, m, y] = o.deadline.split('/').map(Number);
+  const deadline = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (today > deadline && o.status === 'inscricoes-abertas') {
+    return 'inscricoes-fechadas';
+  }
+  return o.status;
+}
+
 function renderCards(list) {
+  list = list.map(o => ({ ...o, status: getEffectiveStatus(o) }));
+  list.sort((a, b) => (STATUS_ORDER[a.status] || 99) - (STATUS_ORDER[b.status] || 99));
   const grid = document.getElementById('olympiads-grid');
   document.getElementById('grid-label').textContent = `${list.length} olimpíada${list.length !== 1 ? 's' : ''} encontrada${list.length !== 1 ? 's' : ''}`;
 

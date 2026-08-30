@@ -2,7 +2,7 @@
 //  auth.js — Autenticação com Google Sheets como banco de dados
 //  ⚠️  Após publicar o Apps Script, cole a URL abaixo:
 // =============================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbyWuh2-WTrPxwv3GX77mxTVhVgy3t5w0qlZhy40oq3b6NKO2JtanOOGKiB3OIvvy8IdUw/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwdRLsGQAwWM47IVFjime591w9qF5n7I7gqn8_66seIktIRv8NXJkRuHP8NIk4iLKg7qg/exec';
 
 const SESSION_KEY = 'olimpiadas_session';
 const LOCAL_KEY = 'olimpiadas_users';
@@ -24,6 +24,52 @@ function hashSimples(str) {
 // -------------------------------------------------------------
 function apiConfigurada() {
   return API_URL && API_URL.startsWith('https://');
+}
+
+// -------------------------------------------------------------
+//  TEMA (claro / escuro)
+// -------------------------------------------------------------
+const THEME_KEY = 'olimpiadas_theme';
+
+function getPreferredTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'dark' || saved === 'light') return saved;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function updateThemeButtons() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.querySelectorAll('.theme-toggle').forEach(btn => {
+    btn.textContent = dark ? '☀️' : '🌙';
+    btn.setAttribute('aria-label', dark ? 'Mudar para tema claro' : 'Mudar para tema escuro');
+    btn.title = dark ? 'Tema claro' : 'Tema escuro';
+  });
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', getPreferredTheme());
+  updateThemeButtons();
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', current ? 'light' : 'dark');
+  localStorage.setItem(THEME_KEY, current ? 'light' : 'dark');
+  updateThemeButtons();
+}
+
+// -------------------------------------------------------------
+//  Cache local de usuários (fallback quando a API estiver fora)
+// -------------------------------------------------------------
+function salvarLocal(user) {
+  const users = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
+  const key = user.codigoMatricula ? 'codigoMatricula:' + String(user.codigoMatricula) : 'escola:' + user.nomeEscola;
+  const idx = users.findIndex(u => {
+    const k = u.codigoMatricula ? 'codigoMatricula:' + String(u.codigoMatricula) : 'escola:' + u.nomeEscola;
+    return k === key;
+  });
+  if (idx !== -1) users[idx] = user; else users.push(user);
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(users));
 }
 
 // -------------------------------------------------------------
@@ -75,6 +121,7 @@ async function register({ nomeCompleto, email, dataNascimento, sexo, codigoMatri
       if (data.ok) {
         const user = { id: data.id, nomeCompleto, email, dataNascimento, sexo, codigoMatricula, nomeEscola, inscricoes: [], role: data.role };
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        salvarLocal({ ...user, codigoMatricula: String(codigoMatricula), senhaHash: hashSimples(senha) });
         return { success: true, user };
       }
       return { success: false, error: data.erro };
@@ -87,7 +134,7 @@ async function register({ nomeCompleto, email, dataNascimento, sexo, codigoMatri
   // ── Fallback: localStorage ─────────────────────────────────
   const users = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
   if (users.find(u => u.codigoMatricula === codigoMatricula)) {
-    return { success: false, erro: 'Já existe uma conta com esse código de matrícula.' };
+    return { success: false, error: 'Já existe uma conta com esse código de matrícula.' };
   }
 
   if (role === 'admin' && adminKey !== 'ADMIN2026') {
@@ -163,6 +210,8 @@ async function registerAdmin({ nomeCompleto, nomeEscola, senha, adminKey }) {
 // -------------------------------------------------------------
 async function login(codigoMatricula, senha) {
 
+  let apiError = null;
+
   // ── Via Google Sheets ──────────────────────────────────────
   if (apiConfigurada()) {
     try {
@@ -179,9 +228,11 @@ async function login(codigoMatricula, senha) {
       console.log('Resposta login:', data);
       if (data.ok) {
         localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
+        salvarLocal({ ...data.usuario, codigoMatricula: String(data.usuario.codigoMatricula), senhaHash: hashSimples(senha) });
         return { success: true, user: data.usuario };
       }
-      return { success: false, error: data.erro };
+      apiError = data.erro;
+      console.warn('API não encontrou o aluno, tentando localStorage:', apiError);
     } catch (err) {
       console.error('Erro na API:', err);
       console.warn('API indisponível, usando localStorage:', err);
@@ -193,13 +244,16 @@ async function login(codigoMatricula, senha) {
   const user = users.find(u => u.codigoMatricula === codigoMatricula && u.senhaHash === hashSimples(senha));
   const userLegacy = !user ? users.find(u => u.codigoMatricula === codigoMatricula && u.senha === senha) : null;
   const found = user || userLegacy;
-  if (!found) return { success: false, error: 'Código de matrícula ou senha incorretos.' };
-  const sessionUser = { ...found };
-  if (!Array.isArray(sessionUser.inscricoes)) {
-    sessionUser.inscricoes = [];
+  if (found) {
+    const sessionUser = { ...found };
+    if (!Array.isArray(sessionUser.inscricoes)) {
+      sessionUser.inscricoes = [];
+    }
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+    return { success: true, user: sessionUser };
   }
-  localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-  return { success: true, user: sessionUser };
+
+  return { success: false, error: apiError || 'Código de matrícula ou senha incorretos.' };
 }
 
 // -------------------------------------------------------------
@@ -286,3 +340,5 @@ function setEnrollmentStatus(olympiadId, status) {
     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   }
 }
+
+applyTheme();

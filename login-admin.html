@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login Admin — OlímpIA Portela</title>
   <meta name="description" content="Faça login como administrador." />
-  <link rel="stylesheet" href="style.css?v=1.1" />
+  <link rel="stylesheet" href="style.css?v=1.2" />
+  <script>try{var t=localStorage.getItem('olimpiadas_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 </head>
 <body class="auth-page">
+  <button class="theme-toggle theme-toggle-fixed" onclick="toggleTheme()" aria-label="Mudar para tema escuro">🌙</button>
   <div class="auth-wrap">
     <div class="auth-logo">
       <div class="logo-icon" style="width: 80px; height: 80px; background: transparent; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.875rem; overflow: hidden;"><img src="logo.png" alt="Logo OlímpIA Portela" style="width: 100%; height: 100%; object-fit: contain;" /></div>

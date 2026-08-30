@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OlímpIA Portela — Início</title>
   <meta name="description" content="Confira e inscreva-se nas olimpíadas disponíveis para alunos da rede pública estadual." />
-  <link rel="stylesheet" href="style.css?v=1.1" />
+  <link rel="stylesheet" href="style.css?v=1.2" />
+  <script>try{var t=localStorage.getItem('olimpiadas_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 </head>
 <body class="app-page">
 
@@ -30,6 +31,7 @@
           📋 Checar pedidos <span class="badge-count" id="badge-count" aria-hidden="true"></span>
         </button>
         <button class="btn-logout" id="btn-logout" aria-label="Sair da conta">⬅ Sair</button>
+        <button class="theme-toggle" onclick="toggleTheme()" aria-label="Mudar para tema escuro">🌙</button>
       </div>
     </div>
   </header>
